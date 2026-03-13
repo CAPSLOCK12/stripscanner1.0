@@ -1,0 +1,1 @@
+# stripscanner1.0
