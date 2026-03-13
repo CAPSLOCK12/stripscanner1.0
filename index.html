@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>StripScan — Steroid Test Analyzer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0c10;
+      --surface: #111318;
+      --border: #1e2330;
+      --accent: #00e5a0;
+      --accent2: #00b8ff;
+      --text: #e8eaf0;
+      --muted: #556075;
+      --dark-line: #4ade80;
+      --medium-line: #facc15;
+      --faint-line: #fb923c;
+      --no-line: #f87171;
+    }
+
+    body {
+      font-family: 'Syne', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem 4rem;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Subtle grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,160,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,160,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .glow-orb {
+      position: fixed;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,229,160,0.06) 0%, transparent 70%);
+      top: -100px;
+      left: -100px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 700px;
+    }
+
+    /* HEADER */
+    header {
+      text-align: center;
+      margin-bottom: 3rem;
+      animation: fadeDown 0.6s ease both;
+    }
+
+    .badge {
+      display: inline-block;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+      border: 1px solid rgba(0,229,160,0.3);
+      padding: 0.3rem 0.8rem;
+      border-radius: 2px;
+      margin-bottom: 1rem;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 6vw, 3.2rem);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #e8eaf0 30%, var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 0.95rem;
+      font-weight: 400;
+    }
+
+    /* UPLOAD CARD */
+    .upload-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2.5rem;
+      margin-bottom: 1.5rem;
+      animation: fadeUp 0.6s ease 0.1s both;
+    }
+
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      position: relative;
+      background: rgba(0,229,160,0.01);
+    }
+
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(0,229,160,0.04);
+    }
+
+    .upload-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .upload-icon {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 1rem;
+      border-radius: 12px;
+      background: rgba(0,229,160,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .upload-icon svg { color: var(--accent); }
+
+    .upload-label {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.3rem;
+    }
+
+    .upload-hint {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 1.5rem;
+      padding: 0.75rem 2rem;
+      background: var(--accent);
+      color: #000;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 0.9rem;
+      letter-spacing: 0.02em;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover { background: #00ffb3; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,229,160,0.25); }
+    .btn:active { transform: translateY(0); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    /* PREVIEW + ANALYSIS AREA */
+    .analysis-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 1.5rem;
+      display: none;
+      animation: fadeUp 0.5s ease both;
+    }
+
+    .analysis-card.visible { display: block; }
+
+    .section-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+
+    .preview-wrapper {
+      position: relative;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #000;
+      margin-bottom: 1.5rem;
+    }
+
+    #preview-img {
+      width: 100%;
+      max-height: 300px;
+      object-fit: contain;
+      display: block;
+    }
+
+    /* Selection overlay */
+    #selection-overlay {
+      position: absolute;
+      border: 2px solid var(--accent);
+      background: rgba(0,229,160,0.12);
+      cursor: crosshair;
+      display: none;
+      pointer-events: none;
+    }
+
+    #preview-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+    }
+
+    .canvas-hint {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-align: center;
+      margin-top: -0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    /* ROI slider fallback */
+    .roi-controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .roi-group label {
+      display: block;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+    }
+
+    .roi-group input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .roi-value {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--accent);
+      margin-top: 0.2rem;
+    }
+
+    /* RESULT */
+    .result-box {
+      border-radius: 12px;
+      padding: 1.5rem;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
+      display: none;
+    }
+
+    .result-box.visible { display: block; animation: fadeUp 0.4s ease both; }
+
+    .result-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .result-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .result-category {
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+    }
+
+    .result-concentration {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .intensity-bar-wrap {
+      margin-top: 1rem;
+    }
+
+    .intensity-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.4rem;
+    }
+
+    .intensity-track {
+      height: 8px;
+      background: var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .intensity-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    /* Legend card */
+    .legend-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem 2rem;
+      animation: fadeUp 0.6s ease 0.2s both;
+    }
+
+    .legend-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--muted);
+    }
+
+    .legend-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.6rem 0.8rem;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .legend-text { font-size: 0.8rem; font-weight: 600; }
+    .legend-sub {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.62rem;
+      color: var(--muted);
+      margin-top: 0.1rem;
+    }
+
+    canvas { display: none; }
+
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 500px) {
+      .legend-grid { grid-template-columns: 1fr; }
+      .roi-controls { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-orb"></div>
+  <div class="container">
+
+    <!-- HEADER -->
+    <header>
+      <div class="badge">Diagnostic Tool · v1.0</div>
+      <h1>StripScan</h1>
+      <p class="subtitle">Upload a lateral flow test strip to analyze steroid concentration</p>
+    </header>
+
+    <!-- UPLOAD -->
+    <div class="upload-card">
+      <div class="upload-zone" id="drop-zone">
+        <input type="file" id="file-input" accept="image/*" />
+        <div class="upload-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
+            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+          </svg>
+        </div>
+        <p class="upload-label">Drop image here or click to browse</p>
+        <p class="upload-hint">PNG · JPG · WEBP — up to 20 MB</p>
+      </div>
+
+      <div style="text-align:center">
+        <button class="btn" id="analyze-btn" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          Analyze Strip
+        </button>
+      </div>
+    </div>
+
+    <!-- PREVIEW + CONTROLS -->
+    <div class="analysis-card" id="analysis-card">
+      <p class="section-label">Image Preview — drag to select test line region</p>
+      <div class="preview-wrapper" id="preview-wrapper">
+        <img id="preview-img" alt="Uploaded strip" />
+        <canvas id="preview-canvas"></canvas>
+      </div>
+      <p class="canvas-hint">↑ Click and drag on the image to set the region of interest (ROI)</p>
+
+      <div class="roi-controls">
+        <div class="roi-group">
+          <label>ROI Y Position</label>
+          <input type="range" id="roi-y" min="0" max="100" value="40" />
+          <div class="roi-value" id="roi-y-val">40%</div>
+        </div>
+        <div class="roi-group">
+          <label>ROI Height</label>
+          <input type="range" id="roi-h" min="2" max="40" value="20" />
+          <div class="roi-value" id="roi-h-val">20%</div>
+        </div>
+      </div>
+
+      <!-- RESULT -->
+      <div class="result-box" id="result-box">
+        <div class="result-header">
+          <div class="result-dot" id="result-dot"></div>
+          <div>
+            <div class="result-category" id="result-category">—</div>
+            <div class="result-concentration" id="result-concentration">—</div>
+          </div>
+        </div>
+        <div class="intensity-bar-wrap">
+          <div class="intensity-label">
+            <span>Brightness (0 = dark, 255 = white)</span>
+            <span id="intensity-num">—</span>
+          </div>
+          <div class="intensity-track">
+            <div class="intensity-fill" id="intensity-fill" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEGEND -->
+    <div class="legend-card">
+      <p class="legend-title">Classification Guide</p>
+      <div class="legend-grid">
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--dark-line)"></div>
+          <div>
+            <div class="legend-text">Dark Line</div>
+            <div class="legend-sub">Low concentration</div>
+          </div>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--medium-line)"></div>
+          <div>
+            <div class="legend-text">Medium Line</div>
+            <div class="legend-sub">Moderate concentration</div>
+          </div>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--faint-line)"></div>
+          <div>
+            <div class="legend-text">Faint Line</div>
+            <div class="legend-sub">High concentration</div>
+          </div>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--no-line)"></div>
+          <div>
+            <div class="legend-text">No Line</div>
+            <div class="legend-sub">Very high concentration</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Hidden canvas for pixel analysis -->
+  <canvas id="hidden-canvas"></canvas>
+
+  <script>
+    const fileInput    = document.getElementById('file-input');
+    const dropZone     = document.getElementById('drop-zone');
+    const analyzeBtn   = document.getElementById('analyze-btn');
+    const analysisCard = document.getElementById('analysis-card');
+    const previewImg   = document.getElementById('preview-img');
+    const previewCanvas= document.getElementById('preview-canvas');
+    const hiddenCanvas = document.getElementById('hidden-canvas');
+    const resultBox    = document.getElementById('result-box');
+    const ctx          = previewCanvas.getContext('2d');
+    const hCtx         = hiddenCanvas.getContext('2d');
+
+    const roiYSlider   = document.getElementById('roi-y');
+    const roiHSlider   = document.getElementById('roi-h');
+    const roiYVal      = document.getElementById('roi-y-val');
+    const roiHVal      = document.getElementById('roi-h-val');
+
+    let uploadedImage  = null;
+    let roiPercent     = { y: 40, h: 20 }; // percentage
+    let isDragging     = false;
+    let dragStart      = { x: 0, y: 0 };
+
+    // ── File input ──────────────────────────────────────────────
+    fileInput.addEventListener('change', e => loadFile(e.target.files[0]));
+
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+    });
+
+    function loadFile(file) {
+      if (!file || !file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const img = new Image();
+        img.onload = () => {
+          uploadedImage = img;
+          previewImg.src = ev.target.result;
+          previewImg.onload = () => {
+            setupCanvas();
+            analysisCard.classList.add('visible');
+            analyzeBtn.disabled = false;
+            resultBox.classList.remove('visible');
+          };
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // ── Canvas overlay ──────────────────────────────────────────
+    function setupCanvas() {
+      const rect = previewImg.getBoundingClientRect();
+      previewCanvas.width  = previewImg.offsetWidth;
+      previewCanvas.height = previewImg.offsetHeight;
+      previewCanvas.style.width  = previewImg.offsetWidth + 'px';
+      previewCanvas.style.height = previewImg.offsetHeight + 'px';
+      drawROI();
+    }
+
+    window.addEventListener('resize', () => { if (uploadedImage) setupCanvas(); });
+
+    function drawROI() {
+      const w = previewCanvas.width;
+      const h = previewCanvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const yPx = (roiPercent.y / 100) * h;
+      const hPx = (roiPercent.h / 100) * h;
+
+      // Dim outside ROI
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(0, 0, w, yPx);
+      ctx.fillRect(0, yPx + hPx, w, h - yPx - hPx);
+
+      // ROI border
+      ctx.strokeStyle = '#00e5a0';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 3]);
+      ctx.strokeRect(0, yPx, w, hPx);
+
+      // Label
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#00e5a0';
+      ctx.font = 'bold 11px Space Mono, monospace';
+      ctx.fillText('ROI', 6, yPx - 5 > 14 ? yPx - 5 : yPx + hPx + 14);
+    }
+
+    // Drag to set ROI
+    previewCanvas.addEventListener('mousedown', e => {
+      isDragging = true;
+      const rect = previewCanvas.getBoundingClientRect();
+      dragStart.y = (e.clientY - rect.top) / previewCanvas.height * 100;
+    });
+
+    previewCanvas.addEventListener('mousemove', e => {
+      if (!isDragging) return;
+      const rect = previewCanvas.getBoundingClientRect();
+      const yNow = (e.clientY - rect.top) / previewCanvas.height * 100;
+      const minY = Math.min(dragStart.y, yNow);
+      const maxY = Math.max(dragStart.y, yNow);
+      roiPercent.y = Math.max(0, Math.min(95, minY));
+      roiPercent.h = Math.max(2, Math.min(100 - roiPercent.y, maxY - minY));
+      roiYSlider.value = Math.round(roiPercent.y);
+      roiHSlider.value = Math.round(roiPercent.h);
+      roiYVal.textContent = Math.round(roiPercent.y) + '%';
+      roiHVal.textContent = Math.round(roiPercent.h) + '%';
+      drawROI();
+    });
+
+    previewCanvas.addEventListener('mouseup', () => { isDragging = false; });
+    previewCanvas.addEventListener('mouseleave', () => { isDragging = false; });
+
+    // Touch support
+    previewCanvas.addEventListener('touchstart', e => {
+      isDragging = true;
+      const rect = previewCanvas.getBoundingClientRect();
+      dragStart.y = (e.touches[0].clientY - rect.top) / previewCanvas.height * 100;
+      e.preventDefault();
+    }, { passive: false });
+
+    previewCanvas.addEventListener('touchmove', e => {
+      if (!isDragging) return;
+      const rect = previewCanvas.getBoundingClientRect();
+      const yNow = (e.touches[0].clientY - rect.top) / previewCanvas.height * 100;
+      const minY = Math.min(dragStart.y, yNow);
+      const maxY = Math.max(dragStart.y, yNow);
+      roiPercent.y = Math.max(0, Math.min(95, minY));
+      roiPercent.h = Math.max(2, Math.min(100 - roiPercent.y, maxY - minY));
+      roiYSlider.value = Math.round(roiPercent.y);
+      roiHSlider.value = Math.round(roiPercent.h);
+      roiYVal.textContent = Math.round(roiPercent.y) + '%';
+      roiHVal.textContent = Math.round(roiPercent.h) + '%';
+      drawROI();
+      e.preventDefault();
+    }, { passive: false });
+
+    previewCanvas.addEventListener('touchend', () => { isDragging = false; });
+
+    // Sliders
+    roiYSlider.addEventListener('input', () => {
+      roiPercent.y = parseInt(roiYSlider.value);
+      roiYVal.textContent = roiPercent.y + '%';
+      drawROI();
+    });
+    roiHSlider.addEventListener('input', () => {
+      roiPercent.h = parseInt(roiHSlider.value);
+      roiHVal.textContent = roiPercent.h + '%';
+      drawROI();
+    });
+
+    // ── Analyze ─────────────────────────────────────────────────
+    analyzeBtn.addEventListener('click', analyzeImage);
+
+    function analyzeImage() {
+      if (!uploadedImage) return;
+
+      const iw = uploadedImage.naturalWidth;
+      const ih = uploadedImage.naturalHeight;
+
+      hiddenCanvas.width  = iw;
+      hiddenCanvas.height = ih;
+      hCtx.drawImage(uploadedImage, 0, 0);
+
+      const yPx = Math.round((roiPercent.y / 100) * ih);
+      const hPx = Math.max(1, Math.round((roiPercent.h / 100) * ih));
+
+      let data;
+      try {
+        data = hCtx.getImageData(0, yPx, iw, hPx).data;
+      } catch(e) {
+        alert('Cannot analyze image due to CORS restrictions. Please use a locally-loaded image file.');
+        return;
+      }
+
+      // Average brightness (luminance)
+      let totalLuminance = 0;
+      const pixelCount = iw * hPx;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i+1], b = data[i+2];
+        // Perceived luminance
+        totalLuminance += 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      }
+      const avgBrightness = totalLuminance / pixelCount;
+
+      showResult(avgBrightness);
+    }
+
+    function showResult(brightness) {
+      let category, concentration, color, cssVar;
+
+      if (brightness < 60) {
+        category      = 'Dark Line';
+        concentration = 'Low Steroid Concentration';
+        cssVar         = '#4ade80';
+      } else if (brightness < 130) {
+        category      = 'Medium Line';
+        concentration = 'Moderate Steroid Concentration';
+        cssVar         = '#facc15';
+      } else if (brightness < 200) {
+        category      = 'Faint Line';
+        concentration = 'High Steroid Concentration';
+        cssVar         = '#fb923c';
+      } else {
+        category      = 'No Line';
+        concentration = 'Very High Steroid Concentration';
+        cssVar         = '#f87171';
+      }
+
+      document.getElementById('result-dot').style.background = cssVar;
+      document.getElementById('result-category').textContent = category;
+      document.getElementById('result-category').style.color  = cssVar;
+      document.getElementById('result-concentration').textContent = concentration;
+      document.getElementById('intensity-num').textContent = Math.round(brightness) + ' / 255';
+
+      const fill = document.getElementById('intensity-fill');
+      fill.style.background = cssVar;
+      // Small delay so transition fires
+      setTimeout(() => {
+        fill.style.width = (brightness / 255 * 100).toFixed(1) + '%';
+      }, 50);
+
+      resultBox.classList.add('visible');
+      resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  </script>
+</body>
+</html>
